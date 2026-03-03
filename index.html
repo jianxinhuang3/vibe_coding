@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Black Hole Particles</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+</head>
+
+<body>
+    <script>
+        let particles = [];
+        const NUM_PARTICLES = 1000;
+        let hasInteracted = false;
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            background(0);
+            for (let i = 0; i < NUM_PARTICLES; i++) {
+                particles.push(new Particle(random(width), random(height)));
+            }
+        }
+
+        function draw() {
+            // Use BLEND mode for drawing the background with low opacity to create fading trails
+            blendMode(BLEND);
+            background(0, 30);
+
+            // Use ADD blending mode for the bright, glowing galaxy visual
+            blendMode(ADD);
+
+            for (let p of particles) {
+                p.behavior();
+                p.update();
+                p.show();
+            }
+        }
+
+        function mousePressed() {
+            hasInteracted = true;
+            for (let p of particles) {
+                p.explode();
+            }
+        }
+
+        function mouseMoved() {
+            hasInteracted = true;
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+
+        class Particle {
+            constructor(x, y) {
+                this.pos = createVector(x, y);
+                this.vel = p5.Vector.random2D().mult(random(2));
+                this.acc = createVector(0, 0);
+
+                // Slightly random behavior parameters to make motion organic
+                this.maxSpeed = random(1.5, 4);
+                this.maxForce = random(0.02, 0.1);
+                this.spiralAngle = random(1.2, 1.5); // Rotation applied to motion towards the target
+
+                // Galaxy/Nebula colors (Blues, Cyans, Purples)
+                let colorType = random(1);
+                if (colorType > 0.5) {
+                    this.baseColor = color(random(50, 100), random(100, 200), random(200, 255));
+                } else {
+                    this.baseColor = color(random(150, 220), random(50, 100), random(200, 255));
+                }
+
+                this.size = random(1, 2.5);
+            }
+
+            behavior() {
+                // Target is either mouse, or center of screen by default
+                let targetX = hasInteracted ? mouseX : width / 2;
+                let targetY = hasInteracted ? mouseY : height / 2;
+                let target = createVector(targetX, targetY);
+
+                let desired = p5.Vector.sub(target, this.pos);
+                let d = desired.mag();
+
+                desired.normalize();
+
+                // Rotate the pointing vector so it forms a spiral orbit instead of a straight line
+                desired.rotate(this.spiralAngle);
+
+                // As they get closer to the core, change speed somewhat
+                let speed = map(d, 0, width, this.maxSpeed * 1.5, this.maxSpeed * 0.5);
+                desired.mult(speed);
+
+                let steer = p5.Vector.sub(desired, this.vel);
+                steer.limit(this.maxForce);
+
+                this.applyForce(steer);
+            }
+
+            explode() {
+                let targetX = hasInteracted ? mouseX : width / 2;
+                let targetY = hasInteracted ? mouseY : height / 2;
+                let target = createVector(targetX, targetY);
+
+                let force = p5.Vector.sub(this.pos, target);
+                let d = force.mag();
+
+                if (d < 1) d = 1; // Prevent division by 0
+                force.normalize();
+
+                // Apply an intense burst of velocity outwards, stronger towards the center
+                let strength = map(constrain(d, 0, width / 2), 0, width / 2, random(15, 30), random(2, 5));
+                force.mult(strength);
+
+                this.vel.add(force);
+            }
+
+            applyForce(force) {
+                this.acc.add(force);
+            }
+
+            update() {
+                this.vel.add(this.acc);
+
+                // Dynamic friction: apply drag if the velocity is heavily spiked (post-explosion)
+                if (this.vel.mag() > this.maxSpeed) {
+                    this.vel.mult(0.95);
+                } else {
+                    this.vel.limit(this.maxSpeed);
+                }
+
+                this.pos.add(this.vel);
+                this.acc.mult(0); // Reset acceleration 
+
+                // Wrapping around the screen seamlessly
+                if (this.pos.x < 0) this.pos.x += width;
+                if (this.pos.x > width) this.pos.x -= width;
+                if (this.pos.y < 0) this.pos.y += height;
+                if (this.pos.y > height) this.pos.y -= height;
+            }
+
+            show() {
+                noStroke();
+
+                let r = red(this.baseColor);
+                let g = green(this.baseColor);
+                let b = blue(this.baseColor);
+
+                // Subtly colored glowing aura
+                fill(r, g, b, 60);
+                ellipse(this.pos.x, this.pos.y, this.size * 5);
+
+                // Bright central core
+                fill(255, 255, 255, 200);
+                ellipse(this.pos.x, this.pos.y, this.size);
+            }
+        }
+    </script>
+</body>
+
+</html>
